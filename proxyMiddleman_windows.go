@@ -24,22 +24,30 @@ func proxyMiddleman() func(req *http.Request) (i *url.URL, e error) {
 				return &url.URL{Host: host}, nil
 			}
 			// Automatic detection did not return any URL, proceed
+			if conf.Static.Active {
+				return getStaticProxyFunc(conf)(req)
+			}
+			return http.ProxyFromEnvironment
 		}
 	}
 	if conf.Static.Active {
-		// If static proxy obtaining is specified
-		prox := httpproxy.Config{
-			HTTPSProxy: mapFallback("https", "", conf.Static.Protocols),
-			HTTPProxy:  mapFallback("http", "", conf.Static.Protocols),
-			NoProxy:    conf.Static.NoProxy,
-		}
-
-		return func(req *http.Request) (i *url.URL, e error) {
-			return prox.ProxyFunc()(req.URL)
-		}
+		return getStaticProxyFunc(conf)
 	}
 	// Should return no proxy, fallthrough.
 	return http.ProxyFromEnvironment
+}
+
+func getStaticProxyFunc(conf ProxyConf) func(req *http.Request) (i *url.URL, e error) {
+	// If static proxy obtaining is specified
+	prox := httpproxy.Config{
+		HTTPSProxy: mapFallback("https", "", conf.Static.Protocols),
+		HTTPProxy:  mapFallback("http", "", conf.Static.Protocols),
+		NoProxy:    conf.Static.NoProxy,
+	}
+
+	return func(req *http.Request) (i *url.URL, e error) {
+		return prox.ProxyFunc()(req.URL)
+	}
 }
 
 // Return oKey or fbKey if oKey doesn't exist in the map.

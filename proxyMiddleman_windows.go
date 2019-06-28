@@ -15,16 +15,18 @@ func proxyMiddleman() func(req *http.Request) (i *url.URL, e error) {
 	if envcfg.HTTPProxy != "" || envcfg.HTTPSProxy != "" {
 		// If the user manually specifies environment variables, prefer those over the Windows config.
 		return http.ProxyFromEnvironment
-	} else if conf.Automatic.Active {
+	}
+	if conf.Automatic.Active {
 		// If automatic proxy obtaining is specified
 		return func(req *http.Request) (i *url.URL, e error) {
 			host := conf.Automatic.FindProxyForURL(req.URL.String())
-			if host == "" {
-				return nil, nil
+			if host != "" {
+				return &url.URL{Host: host}, nil
 			}
-			return &url.URL{Host: host}, nil
+			// Automatic detection did not return any URL, proceed
 		}
-	} else if conf.Static.Active {
+	}
+	if conf.Static.Active {
 		// If static proxy obtaining is specified
 		prox := httpproxy.Config{
 			HTTPSProxy: mapFallback("https", "", conf.Static.Protocols),
@@ -35,10 +37,9 @@ func proxyMiddleman() func(req *http.Request) (i *url.URL, e error) {
 		return func(req *http.Request) (i *url.URL, e error) {
 			return prox.ProxyFunc()(req.URL)
 		}
-	} else {
-		// Final fallthrough case; use the environment variables.
-		return http.ProxyFromEnvironment
 	}
+	// Should return no proxy, fallthrough.
+	return http.ProxyFromEnvironment
 }
 
 // Return oKey or fbKey if oKey doesn't exist in the map.

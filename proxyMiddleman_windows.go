@@ -27,7 +27,7 @@ func proxyMiddleman() func(req *http.Request) (i *url.URL, e error) {
 			if conf.Static.Active {
 				return getStaticProxyFunc(conf)(req)
 			}
-			return http.ProxyFromEnvironment
+			return http.ProxyFromEnvironment(req)
 		}
 	}
 	if conf.Static.Active {

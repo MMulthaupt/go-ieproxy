@@ -16,38 +16,30 @@ func proxyMiddleman() func(req *http.Request) (i *url.URL, e error) {
 		// If the user manually specifies environment variables, prefer those over the Windows config.
 		return http.ProxyFromEnvironment
 	}
-	if conf.Automatic.Active {
-		// If automatic proxy obtaining is specified
-		return func(req *http.Request) (i *url.URL, e error) {
+
+	return func(req *http.Request) (i *url.URL, e error) {
+		if conf.Automatic.Active {
 			host := conf.Automatic.FindProxyForURL(req.URL.String())
 			if host != "" {
 				return &url.URL{Host: host}, nil
 			}
-			// Automatic detection did not return any URL, proceed
-			if conf.Static.Active {
-				return getStaticProxyFunc(conf)(req)
-			}
-			return http.ProxyFromEnvironment(req)
 		}
+		if conf.Static.Active {
+			return staticProxy(conf, req)
+		}
+		// Should return no proxy; fallthrough.
+		return http.ProxyFromEnvironment(req)
 	}
-	if conf.Static.Active {
-		return getStaticProxyFunc(conf)
-	}
-	// Should return no proxy, fallthrough.
-	return http.ProxyFromEnvironment
 }
 
-func getStaticProxyFunc(conf ProxyConf) func(req *http.Request) (i *url.URL, e error) {
+func staticProxy(conf ProxyConf, req *http.Request) (i *url.URL, e error) {
 	// If static proxy obtaining is specified
 	prox := httpproxy.Config{
 		HTTPSProxy: mapFallback("https", "", conf.Static.Protocols),
 		HTTPProxy:  mapFallback("http", "", conf.Static.Protocols),
 		NoProxy:    conf.Static.NoProxy,
 	}
-
-	return func(req *http.Request) (i *url.URL, e error) {
-		return prox.ProxyFunc()(req.URL)
-	}
+	return prox.ProxyFunc()(req.URL)
 }
 
 // Return oKey or fbKey if oKey doesn't exist in the map.
